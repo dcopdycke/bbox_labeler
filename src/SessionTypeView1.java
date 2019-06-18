@@ -95,6 +95,9 @@ public final class SessionTypeView1 extends JFrame implements SessionTypeView {
                         COLUMNS_IN_LOAD_CHOICE_PANEL_GRID));
         this.loadComboBox.setEnabled(true);
         this.fillInLoadComboBox();
+        if (this.loadComboBox.getItemCount() == 0) {
+            this.loadButton.setEnabled(false);
+        }
 
         /*
          * Organize main window using grid layout
@@ -154,7 +157,9 @@ public final class SessionTypeView1 extends JFrame implements SessionTypeView {
         //add the name of each video
         for (int i = 0; i < videoFiles.length; i++) {
             String fileName = videoFiles[i].getName();
-            File[] saveFiles = (new File(FileHelper.userSaveUrl())).listFiles();
+            File saveFolder = new File(FileHelper.userSaveUrl());
+            saveFolder.mkdirs();
+            File[] saveFiles = saveFolder.listFiles();
             for (int j = 0; j < saveFiles.length; j++) {
                 if (saveFiles[j].getName().equals(fileName + ".txt")) {
                     this.loadComboBox.addItem(videoFiles[i].getName());
