@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -187,7 +188,9 @@ public final class YOLOBboxController1 implements YOLOBboxController {
             if (classIndex >= 0) {
 
                 List<File> createdFilesList = new LinkedList<File>();
-                List<File> needUploadedFileList = new LinkedList<File>();
+                CopyOnWriteArrayList<File> needUploadedFileList = new CopyOnWriteArrayList<File>();
+                System.out.println("Creating output files in: "
+                        + FileHelper.userOutputUrl());
                 CreateFilesRunner createFilesRunner = new CreateFilesRunner(
                         this.model, createdFilesList, needUploadedFileList,
                         lastIndex, classIndex);
@@ -206,22 +209,14 @@ public final class YOLOBboxController1 implements YOLOBboxController {
                         needUploadedFileList, dataClassFolder,
                         createFilesThread);
                 List<Thread> uploadFilesThreadsList = new LinkedList<Thread>();
-                for (int i = 0; i < 10; i++) {
+                for (int i = 0; i < 9; i++) {
                     Thread nextThread = new Thread(uploadFilesRunner);
                     uploadFilesThreadsList.add(nextThread);
                     nextThread.start();
                 }
+                this.waitForUploads(createFilesThread, uploadFilesThreadsList,
+                        needUploadedFileList);
 
-                while (createFilesThread.isAlive()
-                        || this.hasLiveThread(uploadFilesThreadsList)) {
-                    try {
-                        System.out.println(
-                                "Still uploading files. Waiting for 3 seconds.");
-                        TimeUnit.SECONDS.sleep(3);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
                 this.appendPFile(lastIndex + (createdFilesList.size() / 2));
                 this.appendVideoPFile(lastIndex + 1,
                         lastIndex + (createdFilesList.size() / 2));
@@ -286,6 +281,24 @@ public final class YOLOBboxController1 implements YOLOBboxController {
         }
     }
 
+    private void waitForUploads(Thread createFilesThread,
+            List<Thread> uploadFilesThreadsList,
+            List<File> needUploadedFileList) {
+        while (createFilesThread.isAlive()
+                || this.hasLiveThread(uploadFilesThreadsList)) {
+            System.out.println(
+                    "Number of files created but not uploaded or queued for upload: "
+                            + needUploadedFileList.size());
+            try {
+                System.out.println(
+                        "Still uploading files. Waiting for 5 seconds.");
+                TimeUnit.SECONDS.sleep(5);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     private boolean hasLiveThread(List<Thread> threads) {
         for (Thread thread : threads) {
             if (thread.isAlive()) {
@@ -293,133 +306,6 @@ public final class YOLOBboxController1 implements YOLOBboxController {
             }
         }
         return false;
-    }
-
-    /**
-     * Creates jpg and txt files in the export folder and returns a list of the
-     * files.
-     *
-     * @param id
-     *            the number that is given to the file
-     * @param fileLocation
-     *            the folder to put the data files in
-     * @param className
-     *            the name of the class the files are for
-     * @param image
-     *            the image to be ouput
-     * @param yolo
-     *            the data to be output
-     * @param index
-     *            the index for the item being labelled
-     * @return the files that were output
-     */
-    private List<File> outputFrame(int id, String fileLocation,
-            String className, BufferedImage image, YOLO yolo, int index) {
-        List<File> fileList = new LinkedList<File>();
-        fileList.addAll(this.outputImage(id, fileLocation, className, image));
-        fileList.addAll(
-                this.outputData(id, fileLocation, className, yolo, index));
-        return fileList;
-    }
-
-    /**
-     * Takes the given int and returns a string of the int with leading zeros to
-     * make the string 5 characters long.
-     *
-     * @param i
-     *            an integer less than 100,000
-     * @return the given integer as a string with leading zeros
-     */
-    private String formattedInteger(int i) {
-        String s = Integer.toString(i);
-        while (s.length() < 5) {
-            s = "0" + s;
-        }
-        return s;
-    }
-
-    /**
-     * Outputs the given image to the given file location formatted with the
-     * class name and the given id as a jpg.
-     *
-     * @param id
-     *            the id to give the file name
-     * @param fileLocation
-     *            the location to output the file to
-     * @param className
-     *            the name of the class being worked on
-     * @param image
-     *            the image to be output
-     * @return the image file that was output as a list of files
-     */
-    private List<File> outputImage(int id, String fileLocation,
-            String className, BufferedImage image) {
-        List<File> fileList = new LinkedList<File>();
-        String formattedID = this.formattedInteger(id);
-        String fileExtension = ".jpg";
-        String fileName = fileLocation + className + "_" + formattedID
-                + fileExtension;
-
-        File imageFile = new File(fileName);
-        //build the path to the file
-        imageFile.getParentFile().mkdirs();
-        //create the file
-        FileHelper.createFile(imageFile);
-
-        try {
-            ImageIO.write(image, "jpg", imageFile);
-        } catch (IOException e) {
-            System.err.println("Problem exporting to jpg");
-            e.printStackTrace();
-        }
-        fileList.add(imageFile);
-        return fileList;
-
-    }
-
-    /**
-     * Outputs the given yolo to the given file location formatted with the
-     * class name and the given id as a text file.
-     *
-     * @param id
-     *            the id to give the file name
-     * @param fileLocation
-     *            the location to output the file to
-     * @param className
-     *            the name of the class being worked on
-     * @param yolo
-     *            the yolo data to be output
-     * @param index
-     *            the index of the item being labelled
-     * @return the text file that was output as a list of files
-     */
-    private List<File> outputData(int id, String fileLocation, String className,
-            YOLO yolo, int index) {
-        List<File> fileList = new LinkedList<File>();
-        PrintWriter writer;
-
-        String formattedID = this.formattedInteger(id);
-        String fileExtension = ".txt";
-
-        File dataFile = new File(
-                fileLocation + className + "_" + formattedID + fileExtension);
-        //build the path to the file
-        dataFile.getParentFile().mkdirs();
-        //create the file
-        FileHelper.createFile(dataFile);
-
-        try {
-            writer = new PrintWriter(dataFile, "UTF-8");
-            //print [item index] [x] [y] [width] [height]
-            writer.println(index + " " + yolo.x() + " " + yolo.y() + " "
-                    + yolo.width() + " " + yolo.height());
-            writer.close();
-        } catch (FileNotFoundException | UnsupportedEncodingException e) {
-            System.err.println("Problem exporting to text file");
-        }
-        fileList.add(dataFile);
-        return fileList;
-
     }
 
     /**
@@ -712,56 +598,6 @@ public final class YOLOBboxController1 implements YOLOBboxController {
     }
 
     /**
-     * Creates the text and data files and puts them in the export folder.
-     *
-     * @param lastIndex
-     * @return the list of files that were created
-     */
-    private List<File> createExportFiles(int lastIndex) {
-        String className = this.model.className();
-        int max = this.model.totalFrames() - 1;
-        List<YOLO> yolo = this.model.yolo();
-        List<File> exportedFiles = new LinkedList<File>();
-        String outputDirectory = FileHelper.userOutputUrl();
-        int index;
-        if ((index = this.getIndex()) > 0) {
-            FFmpegFrameGrabber frameGrabber = this.model.frameGrabber();
-            try {
-                frameGrabber.start();
-                Java2DFrameConverter j = new Java2DFrameConverter();
-
-                //counter for iterating through yolo
-                int i = 0;
-                while (i < max) {
-                    //get the YOLO values
-                    this.findYOLOValues(i);
-                    //iterate through the yolos and create the files for the ones with data
-                    YOLO next = yolo.get(i);
-                    if (next.x() > 0.0 && next.y() > 0.0 && next.width() > 0.0
-                            && next.height() > 0.0) {
-                        frameGrabber.setFrameNumber(i);
-                        BufferedImage image = j
-                                .convert(frameGrabber.grabImage());
-                        int id = lastIndex + 1;
-                        lastIndex++;
-                        exportedFiles
-                                .addAll(this.outputFrame(id, outputDirectory,
-                                        className, image, next, index));
-                    }
-                    i++;
-                }
-                frameGrabber.close();
-                System.out.println(
-                        "Output Files created in : " + outputDirectory);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-        }
-        return exportedFiles;
-    }
-
-    /**
      * Copies the source file to the destination file. If the destination file
      * already exists, it is overwritten.
      *
@@ -830,20 +666,6 @@ public final class YOLOBboxController1 implements YOLOBboxController {
             e.printStackTrace();
         }
         return lastIndex;
-    }
-
-    /**
-     * Uploads each file in the file list to box in the BoxFolder given.
-     *
-     * @param fileList
-     *            the list of files to be uploaded
-     * @param folder
-     *            the folder the files will be added to
-     */
-    private void uploadFiles(List<File> fileList, BoxFolder folder) {
-        for (File file : fileList) {
-            BoxHelper.uploadFile(file.getName(), folder);
-        }
     }
 
     @Override
@@ -1404,24 +1226,6 @@ public final class YOLOBboxController1 implements YOLOBboxController {
         }
     }
 
-    /**
-     * Uses the bboxes find the center x and y and the width and height for a
-     * given frame.
-     */
-    private void findYOLOValues(int frame) {
-        List<BBox> bbox = this.model.labelledBBox();
-        List<YOLO> yolo = this.model.yolo();
-        BBox p = bbox.get(frame);
-        //calculate the values for YOLO from the bbox
-        double width = (Math.abs(p.x1() - p.x2()));
-        double height = (Math.abs(p.y1() - p.y2()));
-        double x = (p.x1() + p.x2()) / 2;
-        double y = (p.y1() + p.y2()) / 2;
-        //add the values to the yolo map
-        YOLO ny = new YOLO(x, y, width, height);
-        yolo.add(frame, ny);
-    }
-
     /*
      * This is not my code. I found it online and just removed some unneeded
      * parts. Not currently used but might be needed for better object tracking.
@@ -1678,89 +1482,6 @@ class CreateFilesRunner implements Runnable {
     }
 
     /**
-     * Gets the index for the class from the index file. If it can't find one,
-     * it asks the user and adds it to the file.
-     *
-     * @return
-     */
-    private int getIndex() {
-        int index = -1;
-        File indexFile = new File(
-                FileHelper.userProgramUrl() + Config.index_file_name);
-        try {
-            BufferedReader indexFileReader = new BufferedReader(
-                    new FileReader(indexFile));
-            String line;
-            Boolean classFound = false;
-            while (!classFound && (line = indexFileReader.readLine()) != null) {
-                if (line.startsWith(this.model.className())) {
-                    line = line.substring(this.model.className().length());
-                    String regex = "([0-9]+)";
-                    Pattern pattern = Pattern.compile(regex);
-                    Matcher matcher = pattern.matcher(line);
-                    if (matcher.find()) {
-                        index = Integer.parseInt(matcher.group());
-                        classFound = true;
-                    }
-                }
-            }
-            indexFileReader.close();
-            if (index == -1) {
-                index = this.askForIndex();
-            }
-        } catch (IOException e) {
-            index = this.askForIndex();
-        }
-        return index;
-    }
-
-    /**
-     * Creates a pop-up window asking the user for an integer to use as the
-     * index for the class. Keeps asking until a valid integer is given or
-     * nothing is given. If a valid integer is given, it writes a line on the
-     * index file for the class and then returns the index. If nothing is given
-     * it returns -1.
-     *
-     * @return the integer given or -1 if nothing is given
-     */
-    private int askForIndex() {
-        int index = -1;
-        String input = "";
-        while (input == "") {
-            input = JOptionPane.showInputDialog("Could not find an index for "
-                    + this.model.className()
-                    + ". Please enter an integer for this class or leave it"
-                    + " empty to stop exporting.");
-            if (input != null && input.length() > 0) {
-                String regex = "([0-9]+)";
-                Pattern pattern = Pattern.compile(regex);
-                Matcher matcher = pattern.matcher(input);
-                if (matcher.find()) {
-                    index = Integer.parseInt(matcher.group());
-                }
-                if (index >= 0) {
-                    File indexFile = new File(FileHelper.userProgramUrl()
-                            + Config.index_file_name);
-                    try {
-                        FileWriter writer = new FileWriter(indexFile);
-                        writer.append(this.model.className() + ": " + index
-                                + System.lineSeparator());
-                        writer.close();
-                    } catch (IOException e) {
-                        System.err.println("Index file could not be written.");
-                        e.printStackTrace();
-                    }
-                } else {
-                    System.out.println(
-                            "Input: " + input + " is not valid. Asking again.");
-                    input = "";
-                }
-            }
-        }
-        return index;
-    }
-
-    /**
      * Uses the bboxes find the center x and y and the width and height for a
      * given frame.
      */
@@ -1818,8 +1539,6 @@ class CreateFilesRunner implements Runnable {
                     i++;
                 }
                 frameGrabber.close();
-                System.out.println(
-                        "Output Files created in : " + outputDirectory);
             } catch (Exception e) {
                 e.printStackTrace();
             }

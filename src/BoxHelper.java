@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Iterator;
+import java.util.concurrent.TimeUnit;
 
 import com.box.sdk.BoxAPIConnection;
 import com.box.sdk.BoxAPIException;
@@ -201,26 +202,41 @@ public class BoxHelper {
      *            the name of the file to be uploaded
      */
     public static void uploadFile(String fileName, BoxFolder folder) {
-        try {
-            System.out.println("Trying to upload file: " + fileName);
-            File file = new File(FileHelper.userOutputUrl() + fileName);
-            folder.canUpload(fileName, file.length());
+        Boolean fileUploaded = false;
+        while (!fileUploaded) {
+            try {
+                System.out.println("Trying to upload file: " + fileName);
+                File file = new File(FileHelper.userOutputUrl() + fileName);
+                folder.canUpload(fileName, file.length());
 
-            //If it can be uploaded, upload the file
-            InputStream is = new FileInputStream(file);
-            folder.uploadFile(is, fileName);
-            is.close();
-        } catch (FileNotFoundException e) {
-            System.out.println(fileName + " could not be found to upload.");
-            e.printStackTrace();
-        } catch (BoxAPIException e) {
-            System.out.println(fileName
-                    + " can not uploaded, likely due to insufficient space.");
-            e.printStackTrace();
-        } catch (IOException e) {
-            System.out.println("I/O Exception while attempting to upload "
-                    + fileName + " to box.");
-            e.printStackTrace();
+                //If it can be uploaded, upload the file
+                InputStream is = new FileInputStream(file);
+                folder.uploadFile(is, fileName);
+                is.close();
+                fileUploaded = true;
+            } catch (BoxAPIException e) {
+                int errorCode = e.getResponseCode();
+                if (errorCode == 429) {
+                    try {
+                        System.out.println(
+                                "Uploading to fast. Waiting 1 second.");
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException e1) {
+                        System.out.println(
+                                "File: " + fileName + " upload intreupted");
+                        e1.printStackTrace();
+                    }
+                } else {
+                    System.out.println("Error Message: " + e.getMessage());
+                }
+            } catch (FileNotFoundException e) {
+                System.out.println(fileName + " could not be found to upload.");
+                e.printStackTrace();
+            } catch (IOException e) {
+                System.out.println("I/O Exception while attempting to upload "
+                        + fileName + " to box.");
+                e.printStackTrace();
+            }
         }
     }
 

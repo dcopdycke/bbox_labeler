@@ -191,7 +191,6 @@ public final class YOLOBboxModel1 implements YOLOBboxModel {
     @Override
     public void setCurrentFrame(int x) {
         this.currentFrame = x;
-        System.out.println("Current Frame: " + this.currentFrame);
     }
 
     @Override
