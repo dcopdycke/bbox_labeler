@@ -153,6 +153,7 @@ public final class YOLOBboxController1 implements YOLOBboxController {
 
             this.model.setCurrentFrame(frameGrabber.getFrameNumber());
             this.processCV();
+            this.view.setTitle("Scylla-" + this.model.file().getName());
         } catch (IOException e) {
             System.out.println("Trouble Loading Video");
         }

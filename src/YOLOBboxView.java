@@ -70,4 +70,6 @@ public interface YOLOBboxView extends ActionListener {
     public void updateButtonAreaSize();
 
     public void dispose();
+
+    public void setTitle(String text);
 }
