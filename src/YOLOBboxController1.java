@@ -153,7 +153,7 @@ public final class YOLOBboxController1 implements YOLOBboxController {
 
             this.model.setCurrentFrame(frameGrabber.getFrameNumber());
             this.processCV();
-            this.view.setTitle("Scylla-" + this.model.file().getName());
+            this.view.setTitle("Scylla - " + this.model.file().getName());
         } catch (IOException e) {
             System.out.println("Trouble Loading Video");
         }
@@ -210,17 +210,17 @@ public final class YOLOBboxController1 implements YOLOBboxController {
                         needUploadedFileList, dataClassFolder,
                         createFilesThread);
                 List<Thread> uploadFilesThreadsList = new LinkedList<Thread>();
-                for (int i = 0; i < 9; i++) {
+                for (int i = 0; i < 15; i++) {
                     Thread nextThread = new Thread(uploadFilesRunner);
                     uploadFilesThreadsList.add(nextThread);
                     nextThread.start();
                 }
                 this.waitForUploads(createFilesThread, uploadFilesThreadsList,
                         needUploadedFileList);
-
-                this.appendPFile(lastIndex + (createdFilesList.size() / 2));
-                this.appendVideoPFile(lastIndex + 1,
-                        lastIndex + (createdFilesList.size() / 2));
+                lastIndex = this.getLowestNumber(createdFilesList);
+                this.appendPFile(lastIndex - 1 + (createdFilesList.size() / 2));
+                this.appendVideoPFile(lastIndex,
+                        lastIndex - 1 + (createdFilesList.size() / 2));
                 DateFormat dateFormatForYear = new SimpleDateFormat("yyyy");
                 String currentYear = dateFormatForYear.format(new Date());
                 String trainingFileName = "train_RS" + currentYear + ".txt";
@@ -280,6 +280,24 @@ public final class YOLOBboxController1 implements YOLOBboxController {
             System.out.println("Problem exporting");
             e1.printStackTrace();
         }
+    }
+
+    private int getLowestNumber(List<File> files) {
+        int lowest = Integer.MAX_VALUE;
+        for (File file : files) {
+            int value = this.getNumber(file);
+            if (value < lowest) {
+                lowest = value;
+            }
+        }
+        return lowest;
+    }
+
+    private int getNumber(File file) {
+        String fileName = file.getName();
+        fileName = fileName.substring(fileName.lastIndexOf("_") + 1,
+                fileName.lastIndexOf("."));
+        return Integer.parseInt(fileName);
     }
 
     private void waitForUploads(Thread createFilesThread,
@@ -645,22 +663,26 @@ public final class YOLOBboxController1 implements YOLOBboxController {
         int lastIndex = 0;
         //parse the file for the line that starts with the name of the video file
         File pFile = new File(
-                FileHelper.userProgramUrl() + Config.training_data_pfile_name);
+                FileHelper.userProgramUrl() + Config.raw_video_pfile_name);
         try {
             BufferedReader pFileBufferedReader = new BufferedReader(
                     new FileReader(pFile));
             String nextLine;
-            String previousLine = "";
+            List<String> fileContents = new LinkedList<String>();
             while ((nextLine = pFileBufferedReader.readLine()) != null) {
-                previousLine = nextLine;
+                fileContents.add(nextLine);
             }
             pFileBufferedReader.close();
-            //cut off everything before the comma, the comma, and the space
-            if (previousLine.length() > 3) {
-                previousLine = previousLine
-                        .substring(previousLine.indexOf(',') + 2);
-                //get the last index value from that line
-                lastIndex = Integer.parseInt(previousLine);
+            int j = fileContents.size() - 1;
+            while (lastIndex == 0 && j >= 0) {
+                if (fileContents.get(j)
+                        .startsWith(this.model.file().getName())) {
+                    String indexString = fileContents.get(j).substring(
+                            fileContents.get(j).lastIndexOf(',') + 2);
+                    //get the last index value from that line
+                    lastIndex = Integer.parseInt(indexString);
+                }
+                j--;
             }
         } catch (IOException e) {
             System.err.println("pfile.txt could not be found on local machine");
@@ -1445,7 +1467,7 @@ class UploadFilesRunner implements Runnable {
                 || this.createdFilesList.size() > 0) {
             if (this.createdFilesList.size() > 0) {
                 File file = this.createdFilesList.remove(0);
-                BoxHelper.uploadFile(file.getName(), this.folder);
+                BoxHelper.reuploadFile(file.getName(), this.folder);
             } else {
                 try {
                     TimeUnit.SECONDS.sleep(1);
@@ -1507,7 +1529,7 @@ class CreateFilesRunner implements Runnable {
      * @return the list of files that were created
      */
     private List<File> createExportFiles(int lastIndex, int classIndex) {
-        String className = this.model.className();
+        String videoName = this.model.file().getName();
         int max = this.model.totalFrames() - 1;
         List<YOLO> yolo = this.model.yolo();
         List<File> exportedFiles = new LinkedList<File>();
@@ -1531,11 +1553,10 @@ class CreateFilesRunner implements Runnable {
                         frameGrabber.setFrameNumber(i);
                         BufferedImage image = j
                                 .convert(frameGrabber.grabImage());
-                        int id = lastIndex + 1;
-                        lastIndex++;
+                        int id = i + 1;
                         exportedFiles
                                 .addAll(this.outputFrame(id, outputDirectory,
-                                        className, image, next, index));
+                                        videoName, image, next, index));
                     }
                     i++;
                 }

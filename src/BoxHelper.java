@@ -248,41 +248,58 @@ public class BoxHelper {
      *            the name of the file to be uploaded
      */
     public static void reuploadFile(String fileName, BoxFolder folder) {
-        try {
-            System.out.println("Trying to upload file: " + fileName);
-            File file = new File(FileHelper.userOutputUrl() + fileName);
+        Boolean fileUploaded = false;
+        while (!fileUploaded) {
+            try {
+                System.out.println("Trying to upload file: " + fileName);
+                File file = new File(FileHelper.userOutputUrl() + fileName);
 
-            //If it can be uploaded, upload the file
-            InputStream is = new FileInputStream(file);
-            if (BoxHelper.fileExists(folder, fileName)) {
-                Iterator<Info> it = folder.getChildren().iterator();
-                boolean fileFound = false;
-                while (!fileFound && it.hasNext()) {
-                    Info info = it.next();
-                    if (info.getName().equals(fileName)) {
-                        fileFound = true;
-                        BoxFile boxFile = (BoxFile) info.getResource();
-                        boxFile.canUploadVersion(fileName, file.length());
-                        boxFile.uploadNewVersion(is);
-                        fileFound = true;
+                //If it can be uploaded, upload the file
+                InputStream is = new FileInputStream(file);
+                if (BoxHelper.fileExists(folder, fileName)) {
+                    Iterator<Info> it = folder.getChildren().iterator();
+                    boolean fileFound = false;
+                    while (!fileFound && it.hasNext()) {
+                        Info info = it.next();
+                        if (info.getName().equals(fileName)) {
+                            fileFound = true;
+                            BoxFile boxFile = (BoxFile) info.getResource();
+                            boxFile.canUploadVersion(fileName, file.length());
+                            boxFile.uploadNewVersion(is);
+                            fileFound = true;
+                        }
                     }
+                } else {
+                    folder.canUpload(fileName, file.length());
+                    folder.uploadFile(is, fileName);
                 }
-            } else {
-                folder.canUpload(fileName, file.length());
-                folder.uploadFile(is, fileName);
+                is.close();
+                fileUploaded = true;
+            } catch (FileNotFoundException e) {
+                System.out.println("File could not be found to upload.");
+                fileUploaded = true;
+                e.printStackTrace();
+            } catch (BoxAPIException e) {
+                int errorCode = e.getResponseCode();
+                if (errorCode == 429) {
+                    try {
+                        System.out.println(
+                                "Uploading to fast. Waiting 1 second.");
+                        TimeUnit.SECONDS.sleep(1);
+                    } catch (InterruptedException e1) {
+                        System.out.println(
+                                "File: " + fileName + " upload intreupted");
+                        e1.printStackTrace();
+                    }
+                } else {
+                    System.out.println("Error Message: " + e.getMessage());
+                }
+            } catch (IOException e) {
+                System.out.println(
+                        "I/O Exception while attempting to upload file to box.");
+                fileUploaded = true;
+                e.printStackTrace();
             }
-            is.close();
-        } catch (FileNotFoundException e) {
-            System.out.println("File could not be found to upload.");
-            e.printStackTrace();
-        } catch (BoxAPIException e) {
-            System.out.println(
-                    "File can not uploaded, likely due to insufficient space.");
-            e.printStackTrace();
-        } catch (IOException e) {
-            System.out.println(
-                    "I/O Exception while attempting to upload file to box.");
-            e.printStackTrace();
         }
     }
 

@@ -160,7 +160,7 @@ public final class NewSessionController1 implements NewSessionController {
                 inColor = !FileHelper.hasVideoBeenDone(name);
                 try {
                     BufferedImage defaultImage = this.getScaledImage(
-                            ImageIO.read(new File("data/default.png")),
+                            ImageIO.read(new File("/data/default.png")),
                             this.thumbnailSize, this.thumbnailSize);
                     this.view.addVideo(defaultImage, name, inColor, c);
                 } catch (IOException e1) {
@@ -173,7 +173,7 @@ public final class NewSessionController1 implements NewSessionController {
             System.err.println("Displaying default image instead");
             try {
                 BufferedImage defaultImage = this.getScaledImage(
-                        ImageIO.read(new File("data/default.png")),
+                        ImageIO.read(new File("/data/default.png")),
                         this.thumbnailSize, this.thumbnailSize);
                 this.view.addVideo(defaultImage, name, inColor, c);
             } catch (IOException e1) {
