@@ -598,7 +598,7 @@ public final class YOLOBboxController1 implements YOLOBboxController {
                     File indexFile = new File(FileHelper.userProgramUrl()
                             + Config.index_file_name);
                     try {
-                        FileWriter writer = new FileWriter(indexFile);
+                        FileWriter writer = new FileWriter(indexFile, true);
                         writer.append(this.model.className() + ": " + index
                                 + System.lineSeparator());
                         writer.close();
